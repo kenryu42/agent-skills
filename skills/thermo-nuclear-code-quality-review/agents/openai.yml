@@ -1,0 +1,6 @@
+interface:
+  display_name: "Thermo Nuclear Code Quality Review"
+  short_description: "Run an extremely strict maintainability reviews"
+policy:
+  allow_implicit_invocation: false
+

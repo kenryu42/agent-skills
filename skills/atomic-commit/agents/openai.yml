@@ -1,0 +1,6 @@
+interface:
+  display_name: "Atomic Commit"
+  short_description: "Create atomic commits"
+policy:
+  allow_implicit_invocation: false
+

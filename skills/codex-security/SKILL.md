@@ -39,7 +39,7 @@ Use the shared scan artifact path conventions in `references/scan-artifacts.md`.
 
 Follow this plan in order. Do not skip ahead to a later phase until the current phase has produced its intended output.
 
-1. Resolve the scan target, `repo_name`, `security_scans_dir`, `scan_id`, `scan_dir`, and `artifacts_dir` using `references/scan-artifacts.md`.
+1. Resolve the scan target, `security_scans_dir`, `scan_id`, `scan_dir`, and `artifacts_dir` using `references/scan-artifacts.md`.
 2. Run the threat-model phase first.
   - Copy the repository-scoped threat model to the per-scan threat model path without alteration for auditability.
   - Treat the per-scan threat model path as the source of truth threat model for later phases.

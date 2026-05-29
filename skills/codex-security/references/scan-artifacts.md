@@ -4,8 +4,7 @@ Use these shared path conventions for Codex Security scan workflows unless the u
 
 ## Base Paths
 
-- `repo_name=<basename of repo_root>`
-- `security_scans_dir=/tmp/codex-security-scans/<repo_name>`
+- `security_scans_dir=./codex-security-scans/`
 - `scan_id=<commit>_<scan timestamp>`
 - `scan_dir=<security_scans_dir>/<scan_id>`
 - `artifacts_dir=<scan_dir>/artifacts`

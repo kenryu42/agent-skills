@@ -16,25 +16,9 @@ Builds polished frontend interfaces with strong visual design.
 
 Stress-tests plans and designs through direct questioning.
 
-## `security-scan`
+## `codex-security`
 
-Runs a full security scan workflow across threat modeling, finding discovery, validation, attack-path analysis, and final reporting.
-
-## `threat-model`
-
-Creates or updates the repository threat model used by security scans.
-
-## `finding-discovery`
-
-Finds plausible security issues in a diff or full repository scan.
-
-## `validation`
-
-Checks whether discovered security findings are real and supported by evidence.
-
-## `attack-path-analysis`
-
-Traces validated findings from source to impact and calibrates severity.
+Runs a full phased security scan workflow across threat modeling, finding discovery, validation, attack-path analysis, and final reporting.
 
 ## `sqlite-expert`
 

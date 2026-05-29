@@ -1,10 +1,3 @@
----
-name: attack-path-analysis
-description: Use when Codex is already in the attack-path-analysis phase of a security scan or the user explicitly asks to trace a security finding from source to sink and calibrate severity. Do not use as the primary trigger for full PR, commit, branch, patch, or repository scans.
-metadata:
-  short-description: Analyze attack paths and severity
----
-
 # Security Attack Path Analysis
 
 ## Objective
@@ -16,11 +9,11 @@ Turn validated or still-plausible findings into explicit attacker stories, struc
 The path references in this skill are the default locations for this phase.
 If the user explicitly provides a different path for a required input or output, use the user-provided path instead of the corresponding default path referenced in this skill.
 If a required input is still missing, stop and ask the user for it before continuing.
-Use the shared scan artifact path conventions in `../../references/scan-artifacts.md`.
+Use the shared scan artifact path conventions in `references/scan-artifacts.md`.
 
 ## Workflow
 
-1. Load the per-scan threat model path from `../../references/scan-artifacts.md` as the repo-specific threat-model source of truth. Start from this along with the potential findings. Both inputs are required for this workflow.
+1. Load the per-scan threat model path from `references/scan-artifacts.md` as the repo-specific threat-model source of truth. Start from this along with the potential findings. Both inputs are required for this workflow.
    - For repository-wide scans, include validation closure rows marked `reportable` or `survives: yes` even if they were not assigned polished candidate numbers during discovery.
 2. Determine whether the affected code is in scope for the repository threat model and whether it belongs to a real product surface or real production workflow.
 3. Build a factual attack path using repository evidence only:
@@ -99,7 +92,7 @@ Render attack-path facts using `references/attack-path-facts.md`.
 - Missing public-ingress evidence is not by itself dispositive counterevidence.
 - Keep attack-path analysis, severity calibration, and final policy suppression as separate sub-stages.
 - Use the final policy-adjustment matrix mechanically rather than re-arguing severity from scratch after the facts are set.
-- Save a final visible report using the attack-path analysis report path from `../../references/scan-artifacts.md`.
+- Save a final visible report using the attack-path analysis report path from `references/scan-artifacts.md`.
 
 -- Considerations for attack path --
 - A finding should count as a real security issue if a realistic attacker could use it from a reasonable attack surface relevant to the product, especially if it is something that is part of the thread model.

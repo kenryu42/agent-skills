@@ -1,0 +1,4 @@
+interface:
+  display_name: "Codex Security"
+  short_description: "Run phased security scans"
+  default_prompt: "Use $codex-security to run a security scan of the target repository or code change and identify vulnerabilities."

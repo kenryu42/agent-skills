@@ -6,7 +6,7 @@ Use this guidance when assembling the final Codex Security markdown report and C
 
 The final output must be markdown.
 
-Write the final markdown report to the final scan report path from `../../../references/scan-artifacts.md`. Keep the threat model and validation artifacts alongside it using that layout so the full scan bundle lives together.
+Write the final markdown report to the final scan report path from `references/scan-artifacts.md`. Keep the threat model and validation artifacts alongside it using that layout so the full scan bundle lives together.
 
 When there are no reportable findings, include a short `No findings` section that explains why nothing survived discovery or the later reportability gates. For repository-wide scans with a coverage ledger, still include `Coverage Closure` so seeded, suppressed, not_applicable, and deferred rows remain auditable.
 

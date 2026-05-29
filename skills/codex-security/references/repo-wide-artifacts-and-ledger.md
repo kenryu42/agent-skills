@@ -4,8 +4,8 @@ Use this reference with `repository-wide-scan.md` for repository-wide security s
 
 ## Artifact Requirements
 
-- Load the per-scan threat model path from `../../../references/scan-artifacts.md` as the repo-specific threat-model source of truth.
-- Build and save a runtime inventory using the runtime inventory path from `../../../references/scan-artifacts.md`.
+- Load the per-scan threat model path from `references/scan-artifacts.md` as the repo-specific threat-model source of truth.
+- Build and save a runtime inventory using the runtime inventory path from `references/scan-artifacts.md`.
   - Do not proceed past repository-wide discovery until `runtime_inventory.md` exists on disk and is referenced by the discovery report. Missing `runtime_inventory.md` means discovery is incomplete, even if candidates or a coverage ledger already exist.
   - Save the runtime inventory immediately after the initial entrypoint/trust-boundary pass, before deep sink review. Large-repo scans should leave this checkpoint even if later validation or environment setup is interrupted.
   - Derive product and privileged surfaces from router declarations, OpenAPI or RPC metadata, public or anonymous endpoints, applied specs, ingress/service config, job/worker definitions, package exports, and privileged local or agent/tool surfaces before free-text sink search.
@@ -22,7 +22,7 @@ Use this reference with `repository-wide-scan.md` for repository-wide security s
 ## Seed Research
 
 - First capture user-provided scope hints such as CVE/GHSA/advisory identifiers, package versions, named vulnerability families, or release/security-test references.
-- When the user request or scan context includes CVE, GHSA, advisory, issue, release, package-version, or explicit vulnerability-family identifiers, run an advisory seed pass before deep frontier scanning and save it to the advisory seed research path from `../../../references/scan-artifacts.md`.
+- When the user request or scan context includes CVE, GHSA, advisory, issue, release, package-version, or explicit vulnerability-family identifiers, run an advisory seed pass before deep frontier scanning and save it to the advisory seed research path from `references/scan-artifacts.md`.
 - Use authoritative advisory text, project security notes, release notes, fix commits, pull requests, issue trackers, and security tests when network access or local history is available. Record the sources searched, candidate files/functions/classes/hunks, expected vulnerable behavior, and any failed lookup attempts.
 - Treat those candidates as seed rows only: validate the vulnerable behavior against the checked-out repository before reporting. Do not let the seed lane replace the repository-wide frontier pass.
 - When CVE/advisory context has a generic or unhelpful category, prioritize advisory, fix-commit, release-note, and security-test lookup before broad sink hotspot scanning. If external lookup is unavailable or inconclusive, run a local regression-seed pass over project-specific protocol, parser, validator, and utility names plus the CVE/advisory terms; do not assume obvious REST/upload/XML hotspots are the intended security regression.

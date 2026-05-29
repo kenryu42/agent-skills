@@ -1,11 +1,9 @@
 ---
-name: security-scan
-description: "Use when the user asks for a full security scan or security code review of a pull request, commit, branch, patch, working-tree diff, or repository. Run distinct phases: threat modeling, finding discovery, validation, attack-path analysis, and final markdown output."
-metadata:
-  short-description: Run security scan
+name: codex-security
+description: "Use when the user asks for a full security scan or security code review of a pull request, commit, branch, patch, working-tree diff, or repository. Orchestrates distinct security phases: threat modeling, finding discovery, validation, attack-path analysis, and final markdown output."
 ---
 
-# Security Scan
+# Codex Security
 
 Used when a user wants to scan a pull request, commit, branch diff, working-tree patch, or repository for security vulnerabilities. Keep the scan phases separate and produce a final markdown report.
 
@@ -13,21 +11,21 @@ Used when a user wants to scan a pull request, commit, branch diff, working-tree
 
 Keep these phases distinct and run them in linear order:
 
-1. `$threat-model`
-2. `$finding-discovery`
-3. `$validation`
-4. `$attack-path-analysis`
+1. `references/phases/threat-model.md`
+2. `references/phases/finding-discovery.md`
+3. `references/phases/validation.md`
+4. `references/phases/attack-path-analysis.md`
 5. Generate final output
 
-Treat this skill as the top-level orchestrator for the four skills plus the final report assembly step. Do not collapse the phases together.
+Treat this skill as the top-level orchestrator for the four phase references plus the final report assembly step. Do not collapse the phases together.
 
 For each phase:
-1. Read that phase's skill.
+1. Read that phase's reference file.
 2. Load only the inputs required for that phase.
 3. Complete that phase's workflow and checklist.
-4. Only then read the next phase's skill.
+4. Only then read the next phase reference.
 
-Do not read ahead into later-phase skills until the current phase has completed.
+Do not read ahead into later-phase references until the current phase has completed.
 Do not amortize effort across phases: complete each phase to the full depth expected by that phase before moving on.
 
 ## Artifact Resolution
@@ -35,31 +33,31 @@ Do not amortize effort across phases: complete each phase to the full depth expe
 The path references in this skill are the default locations for this phase.
 If the user explicitly provides a different path for a required input or output, use the user-provided path instead of the corresponding default path referenced in this skill.
 If a required input is still missing, stop and ask the user for it before continuing.
-Use the shared scan artifact path conventions in `../../references/scan-artifacts.md`.
+Use the shared scan artifact path conventions in `references/scan-artifacts.md`.
 
 ## Execution Plan
 
 Follow this plan in order. Do not skip ahead to a later phase until the current phase has produced its intended output.
 
-1. Resolve the scan target, `repo_name`, `security_scans_dir`, `scan_id`, `scan_dir`, and `artifacts_dir` using `../../references/scan-artifacts.md`.
-2. Run `$threat-model` first.
+1. Resolve the scan target, `repo_name`, `security_scans_dir`, `scan_id`, `scan_dir`, and `artifacts_dir` using `references/scan-artifacts.md`.
+2. Run the threat-model phase first.
   - Copy the repository-scoped threat model to the per-scan threat model path without alteration for auditability.
   - Treat the per-scan threat model path as the source of truth threat model for later phases.
-3. Run `$finding-discovery` as the second step, against the resolved diff and using the per-scan threat model as context.
+3. Run the finding-discovery phase as the second step, against the resolved diff and using the per-scan threat model as context.
   - If discovery produces no technically plausible candidates in a diff-scoped scan, stop there, skip validation and attack-path analysis, and assemble the final markdown report immediately.
   - In repository-wide scans, stop at discovery only when `runtime_inventory.md` exists and the coverage ledger has closed every applicable high-impact and seeded root-control row as `suppressed`, `not_applicable`, or `deferred` with exact reasons. Open, reportable, or unresolved seeded rows continue to validation even when they are not yet numbered as findings.
-4. Run `$validation` as the third step, for each candidate that came out of discovery and, in repository-wide scans, each open, reportable, or deferred seeded/root-control ledger row that still needs closure.
+4. Run the validation phase as the third step, for each candidate that came out of discovery and, in repository-wide scans, each open, reportable, or deferred seeded/root-control ledger row that still needs closure.
   - Pass the resolved scan scope, discovery notes, and candidate inventory to validation. Validation should preserve or suppress the provided instances; it should not independently decide whether a standalone single-candidate request should become diff-scoped or repository-wide.
   - For repository-wide scans, the exhaustive file checklist and discovery coverage ledger are part of the validation input; the ledger is a coverage artifact, not just a findings tracker. Validation should preserve checked surfaces with not_applicable, suppressed, deferred, and reportable dispositions, and continue the ledger's high-impact sibling checks when needed rather than narrowing to one representative finding.
   - As repository-wide rows are validated, keep the saved validation report current enough that reportable, suppressed, not_applicable, and deferred closure rows survive interruption or later phase summarization, including exact root-control file:line and seed-anchor file:line when distinct.
-5. Run `$attack-path-analysis` as the fourth step, for findings and repository-wide validation closure rows that still need reportability, attack-path, and severity analysis after validation.
-6. Assemble the final markdown report last using the final report path from `../../references/scan-artifacts.md` and the outputs of the earlier phases: finding discovery, validation, attack path analysis.
+5. Run the attack-path-analysis phase as the fourth step, for findings and repository-wide validation closure rows that still need reportability, attack-path, and severity analysis after validation.
+6. Assemble the final markdown report last using the final report path from `references/scan-artifacts.md` and the outputs of the earlier phases: finding discovery, validation, attack path analysis.
 
 ## Phase Scope
 
 - Phase 1 (threat model generation) is repository-scope by default, unless the user explicitly asks for narrower scope or provides an authoritative threat model or sufficiently repository-specific security scan guidance such as `AGENTS.md`.
 - For PR, commit, branch, and local-patch scans, Phase 2 onward (finding discovery, validation, attack path analysis) are diff-focused and should follow the changed code and its supporting files.
-- For repository-wide scans, Phase 2 onward remain repository-wide. Before the `$finding-discovery` phase, read `references/repository-wide-scan.md` and every required reference it lists, then use them for finding discovery, validation, and attack path analysis.
+- For repository-wide scans, Phase 2 onward remain repository-wide. Before the finding-discovery phase, read `references/repository-wide-scan.md` and every required reference it lists, then use them for finding discovery, validation, and attack path analysis.
 
 Treat this asymmetry as intentional:
 
@@ -99,7 +97,7 @@ This keeps PR scans precise while avoiding the common failure mode where one rep
 
 When the scan target is repository-wide, follow `references/repository-wide-scan.md` and every required reference it lists.
 
-Use the per-scan artifact directory layout from `../../references/scan-artifacts.md`.
+Use the per-scan artifact directory layout from `references/scan-artifacts.md`.
 
 Important:
 

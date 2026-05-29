@@ -1,0 +1,4 @@
+interface:
+  display_name: "Runtime Review"
+  short_description: "Diagnose CPU spikes and memory issues"
+  default_prompt: "Use $runtime-review to diagnose a Node.js CPU spike and produce a ranked remediation plan."

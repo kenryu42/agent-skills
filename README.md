@@ -16,6 +16,10 @@ Builds polished frontend interfaces with strong visual design.
 
 Stress-tests plans and designs through direct questioning.
 
+## `runtime-review`
+
+Diagnoses runtime CPU spikes, memory growth, heap leaks, GC pressure, and OOM crashes with code-first triage, guided profiling, and before/after verification.
+
 ## `codex-security`
 
 Runs Codex Security scan, diff-scan, deep-scan, finding-fix, and phase workflows.

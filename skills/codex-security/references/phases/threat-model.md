@@ -23,7 +23,7 @@ Use the shared scan artifact path conventions in `references/scan-artifacts.md`.
 
 ## Workflow
 
-1. Resolve `security_scans_dir` and the repository-scoped threat model path using `references/scan-artifacts.md`.
+1. Resolve `repo_name`, `security_scans_dir`, and the repository-scoped threat model path using `references/scan-artifacts.md`.
 2. If the repository-scoped threat model already exists, stop here.
 3. If a threat model or authoritative security scan guidance is provided or referenced:
    - write it exactly to the repository-scoped threat model path

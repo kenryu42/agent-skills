@@ -1,0 +1,6 @@
+path,area,preview
+agents/openai.yaml,.,"interface:   display_name: ""Codex Security""   short_description: ""Security scanning for codebases""   default_prompt: ""Use $codex-security to run a security scan, diff scan, deep scan, or finding fix w"
+assets/report_template_inlined.html,.,"<!doctype html> <html lang=""en""> <head>   <meta charset=""utf-8"">   <meta name=""viewport"" content=""width=device-width, initial-scale=1"">   <title>{escaped_title}</title>   <style>     :root {       col"
+scripts/generate_rank_input.py,.,"#!/usr/bin/env python3 """"""Generate and post-process Codex Security scan worklists.  This script stays deliberately model-free:  - `make-repo-rank-input` creates the deterministic repository-wide candi"
+scripts/render_report_html.py,.,"#!/usr/bin/env python3 """"""Render a Codex Security markdown report as a self-contained HTML file.""""""  from __future__ import annotations  import argparse import html import re from pathlib import Path "
+scripts/validate_report_format.py,.,"#!/usr/bin/env python3 """"""Validate the shared Codex Security final report shape.""""""  from __future__ import annotations  import argparse import re import sys from pathlib import Path  REQUIRED_SECTION"

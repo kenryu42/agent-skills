@@ -18,7 +18,7 @@ Stress-tests plans and designs through direct questioning.
 
 ## `codex-security`
 
-Runs a full phased security scan workflow across threat modeling, finding discovery, validation, attack-path analysis, and final reporting.
+Runs Codex Security scan, diff-scan, deep-scan, finding-fix, and phase workflows.
 
 ## `sqlite-expert`
 

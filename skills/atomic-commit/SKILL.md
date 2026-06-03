@@ -31,6 +31,5 @@ Commit messages must follow [Conventional Commits](https://www.conventionalcommi
 - **Granularity:** Break large tasks into smaller, manageable chunks. There is no "too many commits" limit; prioritize isolation of changes over history brevity.
 - **Message Format:** Write meaningful, descriptive commit messages using the present tense (e.g., "Fix login bug" rather than "Fixed login bug"). Mention the specific component changed and reference issue numbers where applicable.
 
-You have the capability to call multiple tools in a single response.
 Stage and create the commit using a single message. Do not use any other tools or do anything else.
 Do not send any other text or messages besides these tool calls.

@@ -4,30 +4,58 @@ Personal Codex agent skills and shared references.
 
 ## Skills
 
-## `atomic-commit`
+### `atomic-commit`
 
-Creates focused git commits with clear scope.
+Creates atomic git commits with clear scope.
 
-## `frontend-design`
+### `autoreview`
 
-Builds polished frontend interfaces with strong visual design.
+Runs a second-model code review using Codex (`gpt-5.6-sol`) by default, with optional Claude (`claude-fable-5`) review. Pair with `behavior-validator` for user-visible behavior checks.
 
-## `grill-me`
+### `codex-first`
 
-Stress-tests plans and designs through direct questioning.
+Delegates substantial implementation, fixing, code exploration, rebasing, and PR landing to Codex CLI while Claude handles design, decisions, review, and verification.
 
-## `runtime-review`
+### `codex-security`
+
+Runs Codex Security scan, diff-scan, deep-scan, finding-fix, and phase workflows for repository-wide or scoped-path security reviews.
+
+### `commit-with-context`
+
+Creates coherent Conventional Commits with concise, high-signal context. Scopes the commit from the staged index and avoids splitting one task into artificial micro-commits.
+
+### `frontend-design`
+
+Builds distinctive, production-grade frontend interfaces with high design quality. Generates creative, polished code that avoids generic AI aesthetics.
+
+### `grill-me`
+
+Stress-tests plans and designs through relentless direct questioning until reaching shared understanding across every branch of the decision tree.
+
+### `improve`
+
+Surveys any codebase as a senior advisor and produces prioritized, self-contained implementation plans for other models/agents to execute. Strictly read-only on source code — never implements, fixes, or refactors anything itself.
+
+### `repo-explorer`
+
+Clones and inspects external repositories in a reusable local exploration cache (`~/.explore/repos`) without cluttering the active workspace.
+
+### `runtime-review`
 
 Diagnoses runtime CPU spikes, memory growth, heap leaks, GC pressure, and OOM crashes with code-first triage, guided profiling, and before/after verification.
 
-## `codex-security`
+### `sponsor-miner`
 
-Runs Codex Security scan, diff-scan, deep-scan, finding-fix, and phase workflows.
+Finds and verifies potential sponsors for a GitHub repository by mining README sponsorship placements. Outputs a `verified-leads.csv` for outreach planning.
 
-## `sqlite-expert`
+### `sqlite-expert`
 
-Helps with SQLite query writing, indexing, performance, and reliability.
+SQLite database optimization, query writing, indexing, and best practices specialist. Proactively analyzes and optimizes SQLite databases for performance and reliability.
 
-## `thermo-nuclear-code-quality-review`
+### `test-coverage-improver`
 
-Runs a strict maintainability review focused on complexity, abstractions, and large-file risk.
+Runs coverage suites, identifies low-coverage files, proposes high-impact tests, and confirms with the user before writing tests.
+
+### `thermo-nuclear-code-quality-review`
+
+Runs an extremely strict maintainability review focused on abstraction quality, complexity, large-file risk, and spaghetti-condition growth.

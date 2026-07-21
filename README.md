@@ -2,6 +2,45 @@
 
 Personal Codex agent skills and shared references.
 
+## Skill manager
+
+Use the interactive skill manager to install or uninstall skills for one or more coding CLIs.
+
+Requirements:
+
+- Bash 3.2 or newer
+- [`fzf`](https://github.com/junegunn/fzf)
+
+Run it from this repository:
+
+```sh
+./bin/agent-skills
+```
+
+To make `agent-skills` available without changing into this repository, link it into `~/.local/bin`:
+
+```sh
+./bin/agent-skills --install-command
+```
+
+The manager supports these CLI-specific skill directories:
+
+| CLI | Skills directory |
+| --- | --- |
+| Codex | `${CODEX_HOME:-$HOME/.codex}/skills` |
+| Claude Code | `$HOME/.claude/skills` |
+| Pi | `$HOME/.pi/agent/skills` |
+| OpenCode | `$HOME/.config/opencode/skills` |
+| Amp Code | `$HOME/.config/amp/skills` |
+
+The manager never overwrites an occupied destination. Uninstall only removes symlinks that resolve to a skill in this repository. Because installed skills are symlinks, pulling changes into this repository updates them without a separate update command.
+
+Run the manager tests with:
+
+```sh
+./tests/test-agent-skills.sh
+```
+
 ## Skills
 
 ### `atomic-commit`

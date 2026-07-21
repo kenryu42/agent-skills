@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+
+set -u
+
+input=$(mktemp "${TMPDIR:-/tmp}/agent-skills-fzf.XXXXXX") || exit 1
+trap 'rm -f "$input"' EXIT
+cat >"$input"
+
+print_record() {
+	local wanted="$1"
+	local record
+	local key
+
+	while IFS= read -r record; do
+		key=${record%%$'\t'*}
+		if [ "$key" = "$wanted" ]; then
+			printf '%s\n' "$record"
+			return 0
+		fi
+	done <"$input"
+	return 1
+}
+
+print_records() {
+	local wanted_records="$1"
+	local wanted
+	local found=0
+
+	while IFS= read -r wanted; do
+		[ -n "$wanted" ] || continue
+		if print_record "$wanted"; then
+			found=1
+		fi
+	done <<EOF
+$(printf '%s' "$wanted_records" | tr ',' '\n')
+EOF
+
+	[ "$found" -eq 1 ]
+}
+
+case "$*" in
+*"--prompt=Action> "*) print_record "${FZF_TEST_ACTION:-install}" ;;
+*"--prompt=CLIs> "*) print_records "${FZF_TEST_CLIS:-codex}" ;;
+*"--prompt=Skills to install> "*) print_records "${FZF_TEST_SKILLS:-atomic-commit}" ;;
+*"--prompt=Skills to uninstall> "*) print_records "${FZF_TEST_SKILLS:-atomic-commit}" ;;
+*) exit 1 ;;
+esac

@@ -1,0 +1,547 @@
+#!/usr/bin/env bash
+
+set -u
+set -o pipefail
+
+COMMAND_NAME="agent-skills"
+
+resolve_script_path() {
+	local source_path="$1"
+	local source_dir
+	local link_target
+
+	while [ -L "$source_path" ]; do
+		source_dir=$(cd -P "$(dirname "$source_path")" >/dev/null 2>&1 && pwd) || return 1
+		link_target=$(readlink "$source_path") || return 1
+		case "$link_target" in
+		/*) source_path="$link_target" ;;
+		*) source_path="$source_dir/$link_target" ;;
+		esac
+	done
+
+	source_dir=$(cd -P "$(dirname "$source_path")" >/dev/null 2>&1 && pwd) || return 1
+	printf '%s/%s\n' "$source_dir" "$(basename "$source_path")"
+}
+
+SCRIPT_PATH=$(resolve_script_path "${BASH_SOURCE[0]}") || {
+	printf 'Unable to resolve the script path.\n' >&2
+	exit 1
+}
+SCRIPT_DIR=$(dirname "$SCRIPT_PATH")
+REPO_ROOT=$(cd -P "$SCRIPT_DIR/.." >/dev/null 2>&1 && pwd) || {
+	printf 'Unable to resolve the repository root.\n' >&2
+	exit 1
+}
+SKILLS_DIR="$REPO_ROOT/skills"
+
+usage() {
+	cat <<EOF
+Usage: $COMMAND_NAME [--install-command | --help]
+
+Without arguments, interactively install or uninstall repository skills.
+
+Options:
+  --install-command  Link this script into ~/.local/bin/$COMMAND_NAME
+  --help             Show this help
+EOF
+}
+
+cli_display_name() {
+	case "$1" in
+	codex) printf 'Codex\n' ;;
+	claude) printf 'Claude Code\n' ;;
+	pi) printf 'Pi\n' ;;
+	opencode) printf 'OpenCode\n' ;;
+	amp) printf 'Amp Code\n' ;;
+	*) return 1 ;;
+	esac
+}
+
+cli_skills_dir() {
+	case "$1" in
+	codex)
+		if [ -n "${CODEX_HOME:-}" ]; then
+			printf '%s/skills\n' "${CODEX_HOME%/}"
+		else
+			printf '%s/.codex/skills\n' "$HOME"
+		fi
+		;;
+	claude) printf '%s/.claude/skills\n' "$HOME" ;;
+	pi) printf '%s/.pi/agent/skills\n' "$HOME" ;;
+	opencode) printf '%s/.config/opencode/skills\n' "$HOME" ;;
+	amp) printf '%s/.config/amp/skills\n' "$HOME" ;;
+	*) return 1 ;;
+	esac
+}
+
+is_managed_skill_link() {
+	local destination="$1"
+	local source="$2"
+	local resolved_destination
+	local resolved_source
+
+	[ -L "$destination" ] || return 1
+	resolved_destination=$(cd -P "$destination" >/dev/null 2>&1 && pwd) || return 1
+	resolved_source=$(cd -P "$source" >/dev/null 2>&1 && pwd) || return 1
+	[ "$resolved_destination" = "$resolved_source" ]
+}
+
+destination_status() {
+	local destination="$1"
+	local source="$2"
+
+	if is_managed_skill_link "$destination" "$source"; then
+		printf 'installed\n'
+	elif [ -e "$destination" ] || [ -L "$destination" ]; then
+		printf 'conflict\n'
+	else
+		printf 'missing\n'
+	fi
+}
+
+append_name() {
+	local current="$1"
+	local name="$2"
+
+	if [ -n "$current" ]; then
+		printf '%s, %s\n' "$current" "$name"
+	else
+		printf '%s\n' "$name"
+	fi
+}
+
+run_fzf() {
+	local prompt="$1"
+	local multi="$2"
+	local header='ENTER confirm • ESC cancel'
+
+	if [ "$multi" = "true" ]; then
+		header='SPACE toggle selection • ENTER confirm • ESC cancel'
+	fi
+
+	local args=(
+		--height=80%
+		--layout=reverse
+		--border
+		--delimiter=$'\t'
+		--with-nth=2..
+		--prompt="$prompt"
+		--header="$header"
+	)
+
+	if [ "$multi" = "true" ]; then
+		args+=(--multi --bind=space:toggle)
+	fi
+
+	fzf "${args[@]}"
+}
+
+require_fzf() {
+	if ! command -v fzf >/dev/null 2>&1; then
+		printf 'fzf is required. Install it and run %s again.\n' "$COMMAND_NAME" >&2
+		printf 'macOS: brew install fzf\n' >&2
+		exit 1
+	fi
+}
+
+list_cli_records() {
+	local cli
+	local display_name
+	local skills_dir
+
+	for cli in codex claude pi opencode amp; do
+		display_name=$(cli_display_name "$cli")
+		skills_dir=$(cli_skills_dir "$cli")
+		printf '%s\t%-12s %s\n' "$cli" "$display_name" "$skills_dir"
+	done
+}
+
+list_skill_names() {
+	local skill_dir
+
+	for skill_dir in "$SKILLS_DIR"/*; do
+		if [ -d "$skill_dir" ] && [ -f "$skill_dir/SKILL.md" ]; then
+			basename "$skill_dir"
+		fi
+	done
+}
+
+skill_name_width() {
+	local skill
+	local width=0
+
+	while IFS= read -r skill; do
+		if [ "${#skill}" -gt "$width" ]; then
+			width=${#skill}
+		fi
+	done <<EOF
+$(list_skill_names)
+EOF
+
+	printf '%d\n' "$width"
+}
+
+select_clis() {
+	local selection
+
+	selection=$(list_cli_records | run_fzf 'CLIs> ' true) || return 1
+	[ -n "$selection" ] || return 1
+	printf '%s\n' "$selection" | while IFS=$'\t' read -r cli _rest; do
+		[ -n "$cli" ] && printf '%s\n' "$cli"
+	done
+}
+
+list_installable_skill_records() {
+	local selected_clis="$1"
+	local skill
+	local source
+	local cli
+	local destination
+	local status
+	local display_name
+	local missing_names
+	local installed_names
+	local conflict_names
+	local summary
+	local width
+
+	width=$(skill_name_width)
+
+	while IFS= read -r skill; do
+		[ -n "$skill" ] || continue
+		source="$SKILLS_DIR/$skill"
+		missing_names=""
+		installed_names=""
+		conflict_names=""
+
+		while IFS= read -r cli; do
+			[ -n "$cli" ] || continue
+			destination="$(cli_skills_dir "$cli")/$skill"
+			status=$(destination_status "$destination" "$source")
+			display_name=$(cli_display_name "$cli")
+
+			case "$status" in
+			missing) missing_names=$(append_name "$missing_names" "$display_name") ;;
+			installed) installed_names=$(append_name "$installed_names" "$display_name") ;;
+			conflict) conflict_names=$(append_name "$conflict_names" "$display_name") ;;
+			esac
+		done <<EOF
+$selected_clis
+EOF
+
+		[ -n "$missing_names" ] || continue
+		summary="missing: $missing_names"
+		[ -z "$installed_names" ] || summary="$summary | installed: $installed_names"
+		[ -z "$conflict_names" ] || summary="$summary | occupied: $conflict_names"
+		printf '%s\t%-*s %s\n' "$skill" "$width" "$skill" "$summary"
+	done <<EOF
+$(list_skill_names)
+EOF
+}
+
+list_uninstallable_skill_records() {
+	local selected_clis="$1"
+	local skill
+	local source
+	local cli
+	local destination
+	local display_name
+	local installed_names
+	local width
+
+	width=$(skill_name_width)
+
+	while IFS= read -r skill; do
+		[ -n "$skill" ] || continue
+		source="$SKILLS_DIR/$skill"
+		installed_names=""
+
+		while IFS= read -r cli; do
+			[ -n "$cli" ] || continue
+			destination="$(cli_skills_dir "$cli")/$skill"
+			if is_managed_skill_link "$destination" "$source"; then
+				display_name=$(cli_display_name "$cli")
+				installed_names=$(append_name "$installed_names" "$display_name")
+			fi
+		done <<EOF
+$selected_clis
+EOF
+
+		[ -n "$installed_names" ] || continue
+		printf '%s\t%-*s installed: %s\n' "$skill" "$width" "$skill" "$installed_names"
+	done <<EOF
+$(list_skill_names)
+EOF
+}
+
+select_skills() {
+	local records="$1"
+	local prompt="$2"
+	local selection
+
+	selection=$(printf '%s\n' "$records" | run_fzf "$prompt" true) || return 1
+	[ -n "$selection" ] || return 1
+	printf '%s\n' "$selection" | while IFS=$'\t' read -r skill _rest; do
+		[ -n "$skill" ] && printf '%s\n' "$skill"
+	done
+}
+
+confirm() {
+	local answer
+
+	printf 'Proceed? [y/N] '
+	IFS= read -r answer || return 1
+	case "$answer" in
+	y | Y | yes | YES | Yes) return 0 ;;
+	*) return 1 ;;
+	esac
+}
+
+install_skills() {
+	local selected_clis
+	local records
+	local selected_skills
+	local sources=()
+	local destinations=()
+	local skill
+	local source
+	local cli
+	local destination
+	local skills_dir
+	local index
+	local installed=0
+	local failed=0
+
+	selected_clis=$(select_clis) || {
+		return 0
+	}
+	records=$(list_installable_skill_records "$selected_clis")
+	if [ -z "$records" ]; then
+		printf 'No skills are available to install for the selected CLIs.\n'
+		return 0
+	fi
+
+	selected_skills=$(select_skills "$records" 'Skills to install> ') || {
+		return 0
+	}
+
+	while IFS= read -r skill; do
+		[ -n "$skill" ] || continue
+		source="$SKILLS_DIR/$skill"
+		while IFS= read -r cli; do
+			[ -n "$cli" ] || continue
+			destination="$(cli_skills_dir "$cli")/$skill"
+			if [ "$(destination_status "$destination" "$source")" = "missing" ]; then
+				sources[${#sources[@]}]="$source"
+				destinations[${#destinations[@]}]="$destination"
+			fi
+		done <<EOF
+$selected_clis
+EOF
+	done <<EOF
+$selected_skills
+EOF
+
+	if [ ${#destinations[@]} -eq 0 ]; then
+		printf 'Nothing to install.\n'
+		return 0
+	fi
+
+	printf '\nSymlinks to create:\n'
+	for ((index = 0; index < ${#destinations[@]}; index++)); do
+		printf '  %s -> %s\n' "${destinations[$index]}" "${sources[$index]}"
+	done
+	printf '\n'
+	if ! confirm; then
+		printf 'Cancelled.\n'
+		return 0
+	fi
+
+	for ((index = 0; index < ${#destinations[@]}; index++)); do
+		destination="${destinations[$index]}"
+		source="${sources[$index]}"
+		skills_dir=$(dirname "$destination")
+
+		if ! mkdir -p "$skills_dir"; then
+			printf 'Failed to create %s\n' "$skills_dir" >&2
+			failed=$((failed + 1))
+			continue
+		fi
+		if [ -e "$destination" ] || [ -L "$destination" ]; then
+			printf 'Skipped occupied destination: %s\n' "$destination" >&2
+			failed=$((failed + 1))
+			continue
+		fi
+		if ln -s "$source" "$destination"; then
+			installed=$((installed + 1))
+		else
+			printf 'Failed to link %s\n' "$destination" >&2
+			failed=$((failed + 1))
+		fi
+	done
+
+	printf 'Created %d symlink(s).\n' "$installed"
+	[ "$failed" -eq 0 ]
+}
+
+uninstall_skills() {
+	local selected_clis
+	local records
+	local selected_skills
+	local sources=()
+	local destinations=()
+	local skill
+	local source
+	local cli
+	local destination
+	local index
+	local removed=0
+	local failed=0
+
+	selected_clis=$(select_clis) || {
+		return 0
+	}
+	records=$(list_uninstallable_skill_records "$selected_clis")
+	if [ -z "$records" ]; then
+		printf 'No repository-managed skills are installed for the selected CLIs.\n'
+		return 0
+	fi
+
+	selected_skills=$(select_skills "$records" 'Skills to uninstall> ') || {
+		return 0
+	}
+
+	while IFS= read -r skill; do
+		[ -n "$skill" ] || continue
+		source="$SKILLS_DIR/$skill"
+		while IFS= read -r cli; do
+			[ -n "$cli" ] || continue
+			destination="$(cli_skills_dir "$cli")/$skill"
+			if is_managed_skill_link "$destination" "$source"; then
+				sources[${#sources[@]}]="$source"
+				destinations[${#destinations[@]}]="$destination"
+			fi
+		done <<EOF
+$selected_clis
+EOF
+	done <<EOF
+$selected_skills
+EOF
+
+	if [ ${#destinations[@]} -eq 0 ]; then
+		printf 'Nothing to uninstall.\n'
+		return 0
+	fi
+
+	printf '\nSymlinks to remove:\n'
+	for destination in "${destinations[@]}"; do
+		printf '  %s\n' "$destination"
+	done
+	printf '\n'
+	if ! confirm; then
+		printf 'Cancelled.\n'
+		return 0
+	fi
+
+	for ((index = 0; index < ${#destinations[@]}; index++)); do
+		destination="${destinations[$index]}"
+		source="${sources[$index]}"
+		if ! is_managed_skill_link "$destination" "$source"; then
+			printf 'Skipped unmanaged destination: %s\n' "$destination" >&2
+			failed=$((failed + 1))
+			continue
+		fi
+		if unlink "$destination"; then
+			removed=$((removed + 1))
+		else
+			printf 'Failed to remove %s\n' "$destination" >&2
+			failed=$((failed + 1))
+		fi
+	done
+
+	printf 'Removed %d symlink(s).\n' "$removed"
+	[ "$failed" -eq 0 ]
+}
+
+install_command() {
+	local bin_dir="$HOME/.local/bin"
+	local destination="$bin_dir/$COMMAND_NAME"
+	local resolved_destination
+
+	if ! mkdir -p "$bin_dir"; then
+		printf 'Failed to create %s\n' "$bin_dir" >&2
+		return 1
+	fi
+
+	if [ -L "$destination" ]; then
+		resolved_destination=$(resolve_script_path "$destination") || resolved_destination=""
+		if [ "$resolved_destination" = "$SCRIPT_PATH" ]; then
+			printf '%s is already installed at %s\n' "$COMMAND_NAME" "$destination"
+			return 0
+		fi
+	fi
+	if [ -e "$destination" ] || [ -L "$destination" ]; then
+		printf 'Refusing to overwrite existing path: %s\n' "$destination" >&2
+		return 1
+	fi
+
+	ln -s "$SCRIPT_PATH" "$destination" || return 1
+	printf 'Installed %s at %s\n' "$COMMAND_NAME" "$destination"
+	case ":$PATH:" in
+	*":$bin_dir:"*) ;;
+	*) printf 'Add %s to PATH before running %s by name.\n' "$bin_dir" "$COMMAND_NAME" ;;
+	esac
+}
+
+main() {
+	local action_record
+	local action
+
+	case "${1:-}" in
+	--install-command)
+		[ "$#" -eq 1 ] || {
+			usage >&2
+			return 2
+		}
+		install_command
+		return
+		;;
+	--help | -h)
+		usage
+		return
+		;;
+	"") ;;
+	*)
+		usage >&2
+		return 2
+		;;
+	esac
+
+	require_fzf
+	if [ ! -d "$SKILLS_DIR" ]; then
+		printf 'Skills directory not found: %s\n' "$SKILLS_DIR" >&2
+		return 1
+	fi
+
+	action_record=$(
+		printf 'install\tInstall skills\nuninstall\tUninstall skills\n' |
+			run_fzf 'Action> ' false
+	) || {
+		return 0
+	}
+	[ -n "$action_record" ] || {
+		return 0
+	}
+	action=${action_record%%$'\t'*}
+
+	case "$action" in
+	install) install_skills ;;
+	uninstall) uninstall_skills ;;
+	*)
+		printf 'Unknown action: %s\n' "$action" >&2
+		return 1
+		;;
+	esac
+}
+
+main "$@"

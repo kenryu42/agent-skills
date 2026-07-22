@@ -109,9 +109,14 @@ command codex exec --yolo -C <repo> -m gpt-5.6-sol \
 
 Codex starts with zero session context. Every prompt: goal, exact repo/paths, constraints, non-goals, proof expected (exact test command), output shape ("report files changed + test output"). Spec quality decides success.
 
+Minimal-shape gate: before freezing the spec, state the minimal shape — the smallest change satisfying the goal — and make it the spec's scope ceiling. Instruct Codex: anything it believes is needed beyond the ceiling comes back as a question in the report, not as code. Speculative machinery (schemas/validators/frameworks ahead of first real use, checks their own author can trivially satisfy, forced-constant fields) is always outside the ceiling.
+
+Plan-first for vague tasks: when no spec can be frozen up front (diagnose-then-fix, "make X work"), split the run. Phase 1 prompt: diagnose, report the minimal shape + any beyond-ceiling suggestions, make NO file edits. On return, `git status --short` in the target repo must be clean — a dirty tree means the gate failed; reset it and still treat the output as plan-only. Claude approves or trims the shape, then `resume` the same session with the approved ceiling to implement — diagnosis context carries over free. Skip the split for tiny fixes with one obvious change; the delegation overhead loses.
+
 ## Verify (Claude, always)
 
 - `git status -sb` + read the full diff; judge like a contributor PR
+- scope gate: diff must fit the spec's minimal shape. Unrequested machinery gets trimmed via resume before anything else is reviewed — over-engineering is a defect, not a bonus
 - run focused tests yourself or demand proof output; Codex claims are advisory
 - iterate via resume; after 2 failed rounds, take over and do it directly
 - normal closeout still applies: `$autoreview` before ship

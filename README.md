@@ -98,3 +98,7 @@ Runs coverage suites, identifies low-coverage files, proposes high-impact tests,
 ### `thermo-nuclear-code-quality-review`
 
 Runs an extremely strict maintainability review focused on abstraction quality, complexity, large-file risk, and spaghetti-condition growth.
+
+### `ultra`
+
+Runs a manual multi-agent build workflow: scope and design on Fable, exploration on Sonnet, implementation on Opus, then review via autoreview with Fable judging and applying fixes.

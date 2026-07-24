@@ -29,3 +29,4 @@ Run the user's multi-agent build workflow on the task given in the arguments. Th
 
 - The workflow itself decides how many explorers and implementers to spawn based on task complexity; do not pre-decide counts in the task text.
 - Model roles are fixed inside the script (Scope/Design/Review-judge/Fix: Fable; Explore: Sonnet; Implement: Opus). Do not override them.
+- The workflow fails fast: it throws if a critical agent dies or an implementer reports its work item blocked. Report the error and what completed; once the blocker is resolved, resume with `Workflow({scriptPath, resumeFromRunId})` so finished agents replay from cache.

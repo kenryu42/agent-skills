@@ -1,27 +1,12 @@
 export const meta = {
   name: "ultra",
   description:
-    "Ultra workflow: scope+design (Fable), explore (Sonnet), implement (Opus), review via autoreview with Fable judging and applying fixes. Fan-out is dynamic per task complexity.",
+    "Ultra workflow: a Fable planner designs a task-specific stage plan (search/explore: Sonnet, design/review: Fable, implement: Opus), an interpreter executes it, then a Fable review+fix loop closes it out.",
   phases: [
     {
-      title: "Scope",
-      detail: "assess complexity, capture baseline, choose exploration questions",
+      title: "Plan",
+      detail: "fable planner scopes the task, captures baseline, emits the stage plan",
       model: "fable",
-    },
-    {
-      title: "Explore",
-      detail: "one sonnet explorer per question",
-      model: "sonnet",
-    },
-    {
-      title: "Design",
-      detail: "implementation plan + work breakdown",
-      model: "fable",
-    },
-    {
-      title: "Implement",
-      detail: "one opus implementer per work item, sequential",
-      model: "opus",
     },
     {
       title: "Review",
@@ -45,33 +30,72 @@ const ensure = (result, what) => {
 
 const PROJECT_PREAMBLE = `Work in the repository at your current working directory. First read the project instruction files if they exist (CLAUDE.md, AGENTS.md, CONTRIBUTING.md, README.md) and follow their conventions exactly. Never commit, never push, never touch generated/build output directories.`;
 
-phase("Scope");
-const scope = ensure(
+// The planner picks roles; this table — not the planner — picks models.
+const ROLE_MODEL = {
+  search: { model: "sonnet" },
+  explore: { model: "sonnet" },
+  design: { model: "fable" },
+  implement: { model: "opus" },
+  review: { model: "fable" },
+};
+
+phase("Plan");
+const plan = ensure(
   await agent(
     `${PROJECT_PREAMBLE}
 
-You are scoping this task before design:
+You are the workflow planner. Design a stage plan tailored to this task; separate agents who cannot see this conversation will execute it.
 
+## Task
 ${TASK}
 
-Skim the codebase enough to judge its real complexity — do not deep-dive. Return:
-- exploreQuestions: the exploration questions parallel read-only explorers should each answer before design. Scale the count to complexity: an empty list when the task text already contains everything design needs; a small focused change may need 1; a sweeping one may need 6+. Each question must be self-contained and name concrete areas/files/conventions to investigate (when exploring at all, include one question covering existing tests and test conventions).
+Skim the codebase enough to judge its real complexity — do not deep-dive.
+
+## How the plan is executed
+- Stages run strictly in order. Prompts within a stage run in parallel — except in 'implement' stages, whose prompts run one at a time in order.
+- Roles and who executes them:
+  - 'search' — locate files, map layout, inventory usages (fast read-only lookups)
+  - 'explore' — read code and answer a question precisely with file:line references and verbatim excerpts
+  - 'design' — architect the implementation plan from the task and all earlier stage results (strongest model; use when the change needs real design work)
+  - 'implement' — apply edits and their tests for one self-contained work item
+  - 'review' — mid-flow verification of intermediate results (only when a later stage depends on an earlier one being right)
+- Every executing agent automatically receives the task, your project notes, the baseline state, and the full results of all earlier stages. Each prompt therefore only needs to state that agent's specific job — but must be self-contained in stating it (name concrete files/areas/conventions where you know them).
+- If you include a 'design' stage, later 'implement' prompts may defer their edit details to the design stage's output ("implement work item N from the design").
+- Scale the plan to complexity: a small cohesive change may be a single 'implement' stage with one prompt; a sweeping task may need search/explore fan-outs, a design stage, and several implement items. Do not pad the plan with stages the task does not need.
+- Do NOT add a final review stage — a review-and-fix loop always runs automatically after your stages.
+
+Also capture the scope facts:
 - projectNotes: project facts every later agent needs (instruction files found and their key rules, language/toolchain, layout).
 - verifyCommand: the single command that verifies changes (from project instructions or package scripts, e.g. 'bun run check', 'npm test'); empty string if none exists.
 - baselineDirty: the verbatim output of 'git status --porcelain' right now (empty string if the tree is clean), so later agents can tell pre-existing uncommitted changes from their own.
 - baselineVerify: run the verify command once, before anything changes: 'pass' if it succeeds, 'fail' if it does not, 'not-run' if there is no verify command or running it here is impractical.
 - baselineVerifyDetail: when 'fail', the failing test names or error tail; otherwise empty string.`,
     {
-      label: "scope",
-      phase: "Scope",
+      label: "plan",
+      phase: "Plan",
       model: "fable",
-      effort: "medium",
       schema: {
         type: "object",
         properties: {
-          exploreQuestions: {
+          stages: {
             type: "array",
-            items: { type: "string" },
+            minItems: 1,
+            items: {
+              type: "object",
+              properties: {
+                title: { type: "string" },
+                role: {
+                  type: "string",
+                  enum: ["search", "explore", "design", "implement", "review"],
+                },
+                prompts: {
+                  type: "array",
+                  minItems: 1,
+                  items: { type: "string" },
+                },
+              },
+              required: ["title", "role", "prompts"],
+            },
           },
           projectNotes: { type: "string" },
           verifyCommand: { type: "string" },
@@ -80,7 +104,7 @@ Skim the codebase enough to judge its real complexity — do not deep-dive. Retu
           baselineVerifyDetail: { type: "string" },
         },
         required: [
-          "exploreQuestions",
+          "stages",
           "projectNotes",
           "verifyCommand",
           "baselineDirty",
@@ -90,114 +114,29 @@ Skim the codebase enough to judge its real complexity — do not deep-dive. Retu
       },
     },
   ),
-  "Scope",
+  "Plan",
 );
 
 const baselineSections = [];
-if (scope.baselineDirty)
+if (plan.baselineDirty)
   baselineSections.push(
-    `The tree already had uncommitted changes BEFORE this workflow started (git status --porcelain):\n${scope.baselineDirty}\nThose changes are not part of this task — do not revert, absorb, extend, or review them.`,
+    `The tree already had uncommitted changes BEFORE this workflow started (git status --porcelain):\n${plan.baselineDirty}\nThose changes are not part of this task — do not revert, absorb, extend, or review them.`,
   );
-if (scope.baselineVerify === "fail")
+if (plan.baselineVerify === "fail")
   baselineSections.push(
-    `The verify command was already failing BEFORE this workflow started:\n${scope.baselineVerifyDetail}\nPre-existing failures are not yours to fix — only make sure no NEW failures appear.`,
+    `The verify command was already failing BEFORE this workflow started:\n${plan.baselineVerifyDetail}\nPre-existing failures are not yours to fix — only make sure no NEW failures appear.`,
   );
 const BASELINE = baselineSections.length
   ? `## Baseline state (before this workflow)\n${baselineSections.join("\n\n")}\n\n`
   : "";
 
-phase("Explore");
-log(`Scoped: ${scope.exploreQuestions.length} exploration question(s)`);
-let reports = [];
-if (scope.exploreQuestions.length > 0) {
-  reports = (
-    await parallel(
-      scope.exploreQuestions.map(
-        (q, i) => () =>
-          agent(
-            `${PROJECT_PREAMBLE}
-
-Read-only exploration — do not modify anything. The overall task is:
-
-${TASK}
-
-Project notes: ${scope.projectNotes}
-
-Answer this exploration question precisely, with file:line references and verbatim code excerpts: ${q}
-
-Return raw structured notes for another agent, not prose for a human.`,
-            {
-              label: `explore:${i + 1}`,
-              phase: "Explore",
-              model: "sonnet",
-              effort: "medium",
-            },
-          ),
-      ),
-    )
-  ).filter(Boolean);
-  if (reports.length < scope.exploreQuestions.length)
-    log(
-      `${scope.exploreQuestions.length - reports.length} explorer(s) failed or were skipped; designing from ${reports.length} report(s)`,
-    );
-}
-
-phase("Design");
-const design = ensure(
-  await agent(
-    `${PROJECT_PREAMBLE}
-
-You are the design architect. Design the smallest change that satisfies the task — no speculative machinery, no frameworks; honor any scope-discipline rules in the project instructions.
-
-## Task (trust any facts it states as already verified)
-${TASK}
-
-## Project notes
-${scope.projectNotes}
-
-${BASELINE}## Exploration reports
-${reports.length ? reports.map((r, i) => `### Report ${i + 1}\n${r}`).join("\n\n") : "(none — scoping judged the task text sufficient)"}
-
-Return:
-- plan: the full implementation plan — ordered edits (file, location, exact intended code shape), the test plan (which test files get which cases and what realistic mistake each catches), and one-sentence justifications for any open design decisions you settled.
-- workItems: the plan split into independent work items to be implemented ONE AT A TIME IN ORDER by separate implementers. Scale the count to complexity — one item for a cohesive change; more only when the task genuinely decomposes. Each item's instructions must be self-contained given the plan.
-- verifyCommand: confirm or correct '${scope.verifyCommand}'.`,
-    {
-      label: "design:plan",
-      phase: "Design",
-      model: "fable",
-      schema: {
-        type: "object",
-        properties: {
-          plan: { type: "string" },
-          workItems: {
-            type: "array",
-            minItems: 1,
-            items: {
-              type: "object",
-              properties: {
-                title: { type: "string" },
-                instructions: { type: "string" },
-              },
-              required: ["title", "instructions"],
-            },
-          },
-          verifyCommand: { type: "string" },
-        },
-        required: ["plan", "workItems", "verifyCommand"],
-      },
-    },
-  ),
-  "Design",
-);
-
 let verifyStep;
-if (!design.verifyCommand) {
+if (!plan.verifyCommand) {
   verifyStep = `Then verify your change compiles/passes whatever checks the project provides and report how you verified it.`;
-} else if (scope.baselineVerify === "fail") {
-  verifyStep = `Then run '${design.verifyCommand}'. Failures already present at baseline are not yours to fix — make sure no NEW failures appear, and include the verbatim tail of the output in your report.`;
+} else if (plan.baselineVerify === "fail") {
+  verifyStep = `Then run '${plan.verifyCommand}'. Failures already present at baseline are not yours to fix — make sure no NEW failures appear, and include the verbatim tail of the output in your report.`;
 } else {
-  verifyStep = `Then run '${design.verifyCommand}' and fix failures until it passes; include the verbatim tail of its passing output in your report.`;
+  verifyStep = `Then run '${plan.verifyCommand}' and fix failures until it passes; include the verbatim tail of its passing output in your report.`;
 }
 
 const IMPL_SCHEMA = {
@@ -218,42 +157,83 @@ const IMPL_SCHEMA = {
   ],
 };
 
-phase("Implement");
-log(`Implementing ${design.workItems.length} work item(s)`);
-const implReports = [];
-for (const [i, item] of design.workItems.entries()) {
-  const report = ensure(
-    await agent(
-      `${PROJECT_PREAMBLE}
+log(
+  `Plan: ${plan.stages.map((s) => `${s.title} (${s.role}×${s.prompts.length})`).join(" → ")}`,
+);
 
-You are the implementer for work item ${i + 1}/${design.workItems.length}: "${item.title}". Work directly on the current branch. Follow the project's style conventions strictly and make the smallest change that satisfies the item.
+const stageContext = (record) => `${PROJECT_PREAMBLE}
 
 ## Task
 ${TASK}
 
-${BASELINE}## Full plan
-${design.plan}
+## Project notes
+${plan.projectNotes}
+
+${BASELINE}${record ? `## Results from earlier stages\n${record}\n\n` : ""}`;
+
+let record = "";
+const implReports = [];
+for (const [si, stage] of plan.stages.entries()) {
+  const opts = ROLE_MODEL[stage.role];
+  const stageLabel = `${si + 1}:${stage.title}`;
+
+  if (stage.role === "implement") {
+    const itemReports = [];
+    for (const [i, prompt] of stage.prompts.entries()) {
+      const report = ensure(
+        await agent(
+          `${stageContext(record)}You are the implementer for item ${i + 1}/${stage.prompts.length} of stage "${stage.title}". Work directly on the current branch. Follow the project's style conventions strictly and make the smallest change that satisfies the item.
 
 ## Your work item
-${item.instructions}
+${prompt}
 
-${implReports.length > 0 ? `## Reports from work items already completed\n${implReports.join("\n\n")}\n\n` : ""}Apply the edits and their planned tests. ${verifyStep} Return structured output: status 'done' when the item is fully applied and verified; 'blocked' (with blockedReason) ONLY when the item genuinely cannot be completed — a contradictory plan, missing tooling or credentials — never for difficulty you can work through. filesChanged: each changed file followed by ' — ' and a one-line rationale. deviations: departures from the plan with reasons, empty string if none. verification: how the item was verified, quoting the output tail when a verify command was run.`,
-      {
-        label: `implement:${i + 1}:${item.title.slice(0, 30)}`,
-        phase: "Implement",
-        model: "opus",
-        schema: IMPL_SCHEMA,
-      },
-    ),
-    `Implement (work item ${i + 1})`,
-  );
-  if (report.status === "blocked")
-    throw new Error(
-      `Work item ${i + 1} "${item.title}" blocked: ${report.blockedReason}`,
-    );
-  implReports.push(
-    `### Work item ${i + 1}: ${item.title}\nFiles changed:\n${report.filesChanged.map((f) => `- ${f}`).join("\n") || "- (none)"}\nDeviations: ${report.deviations || "none"}\nVerification: ${report.verification}`,
-  );
+${itemReports.length > 0 ? `## Reports from items already completed in this stage\n${itemReports.join("\n\n")}\n\n` : ""}Apply the edits and their planned tests. ${verifyStep} Return structured output: status 'done' when the item is fully applied and verified; 'blocked' (with blockedReason) ONLY when the item genuinely cannot be completed — a contradictory plan, missing tooling or credentials — never for difficulty you can work through. filesChanged: each changed file followed by ' — ' and a one-line rationale. deviations: departures from the item's instructions with reasons, empty string if none. verification: how the item was verified, quoting the output tail when a verify command was run.`,
+          {
+            label: `implement:${stageLabel}:${i + 1}`,
+            phase: stage.title,
+            ...opts,
+            schema: IMPL_SCHEMA,
+          },
+        ),
+        `Implement (stage ${si + 1}, item ${i + 1})`,
+      );
+      if (report.status === "blocked")
+        throw new Error(
+          `Stage ${si + 1} "${stage.title}" item ${i + 1} blocked: ${report.blockedReason}`,
+        );
+      const itemReport = `### Item ${i + 1}\nFiles changed:\n${report.filesChanged.map((f) => `- ${f}`).join("\n") || "- (none)"}\nDeviations: ${report.deviations || "none"}\nVerification: ${report.verification}`;
+      itemReports.push(itemReport);
+      implReports.push(`Stage "${stage.title}" ${itemReport}`);
+    }
+    record += `\n\n## Stage ${si + 1}: ${stage.title} (implement)\n${itemReports.join("\n\n")}`;
+  } else {
+    const results = (
+      await parallel(
+        stage.prompts.map(
+          (prompt, i) => () =>
+            agent(
+              `${stageContext(record)}${stage.role === "search" || stage.role === "explore" ? "Read-only — do not modify anything. " : ""}Your job in stage "${stage.title}":
+
+${prompt}
+
+Return raw structured notes for another agent, not prose for a human. When reporting on code, cite file:line.`,
+              {
+                label: `${stage.role}:${stageLabel}:${i + 1}`,
+                phase: stage.title,
+                ...opts,
+              },
+            ),
+        ),
+      )
+    ).filter(Boolean);
+    if (results.length < stage.prompts.length)
+      log(
+        `Stage ${si + 1} "${stage.title}": ${stage.prompts.length - results.length} agent(s) failed or were skipped`,
+      );
+    if (results.length === 0)
+      throw new Error(`Stage ${si + 1} "${stage.title}": every agent failed`);
+    record += `\n\n## Stage ${si + 1}: ${stage.title} (${stage.role})\n${results.map((r, i) => `### Result ${i + 1}\n${r}`).join("\n\n")}`;
+  }
 }
 
 const REVIEW_SCHEMA = {
@@ -278,11 +258,11 @@ const REVIEW_SCHEMA = {
 };
 
 let reviewVerifyStep = "";
-if (design.verifyCommand) {
+if (plan.verifyCommand) {
   reviewVerifyStep =
-    scope.baselineVerify === "fail"
-      ? `4. Run '${design.verifyCommand}' yourself and treat any NEW failure beyond the pre-existing baseline failures as a must-fix finding.`
-      : `4. Run '${design.verifyCommand}' yourself and treat any failure as a must-fix finding.`;
+    plan.baselineVerify === "fail"
+      ? `4. Run '${plan.verifyCommand}' yourself and treat any NEW failure beyond the pre-existing baseline failures as a must-fix finding.`
+      : `4. Run '${plan.verifyCommand}' yourself and treat any failure as a must-fix finding.`;
 }
 
 const reviewPrompt = (extra) => `${PROJECT_PREAMBLE}
@@ -292,29 +272,26 @@ You are the reviewer and judge for the uncommitted changes on the current branch
 ## What the change must accomplish
 ${TASK}
 
-${BASELINE}## The plan
-${design.plan}
+${BASELINE}## Work record (all stages that produced the changes)
+${record}
 
 ${extra}
 
 Review procedure:
 1. Invoke the 'autoreview' skill via the Skill tool to review the uncommitted changes. If the Skill tool or the autoreview skill is unavailable in your environment, review them yourself instead: run 'git diff' and 'git status' and read every changed file with surrounding context.
-2. Whichever path step 1 took, also hunt yourself for: correctness bugs, scope creep beyond the plan, style violations, and tests that would not fail if the mistake they guard were made.
+2. Whichever path step 1 took, also hunt yourself for: correctness bugs, scope creep beyond the task, style violations, and tests that would not fail if the mistake they guard were made.
 3. Acting as judge, verify each candidate finding against the actual code — no speculative findings — and decide which genuinely must be fixed (real defects or clear scope violations only).
 ${reviewVerifyStep}
 Return every verified finding with must_fix set per your judgment, and verdict 'approve' only if nothing must be fixed.`;
 
 phase("Review");
 let review = ensure(
-  await agent(
-    reviewPrompt(`## Implementer reports\n${implReports.join("\n\n")}`),
-    {
-      label: "review+judge",
-      phase: "Review",
-      model: "fable",
-      schema: REVIEW_SCHEMA,
-    },
-  ),
+  await agent(reviewPrompt(""), {
+    label: "review+judge",
+    phase: "Review",
+    model: "fable",
+    schema: REVIEW_SCHEMA,
+  }),
   "Review",
 );
 
@@ -336,8 +313,8 @@ You are fixing confirmed review findings on the current branch. Apply the smalle
 ${BASELINE}## Findings to fix
 ${JSON.stringify(mustFix, null, 2)}
 
-## Original plan for context
-${design.plan}
+## Work record for context
+${record}
 
 Apply the fixes. ${verifyStep} Return what you changed per finding.`,
       { label: `fix:round${round}`, phase: "Fix", model: "fable" },
@@ -372,8 +349,7 @@ if (
 }
 
 return {
-  plan: design.plan,
-  workItems: design.workItems.map((w) => w.title),
+  stages: plan.stages.map((s) => `${s.title} (${s.role}×${s.prompts.length})`),
   implReports,
   review,
   fixRounds: round,

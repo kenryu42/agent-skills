@@ -1,6 +1,6 @@
 ---
 name: ultra
-description: Manual multi-agent build workflow — scope & design (Fable), explore (Sonnet), implement (Opus), review via autoreview with Fable judging and writing fixes.
+description: Manual multi-agent build workflow — a Fable planner designs a task-specific stage plan (search/explore Sonnet, design/review Fable, implement Opus), then a Fable review+fix loop closes it out.
 disable-model-invocation: true
 ---
 
@@ -27,6 +27,6 @@ Run the user's multi-agent build workflow on the task given in the arguments. Th
 
 ## Notes
 
-- The workflow itself decides how many explorers and implementers to spawn based on task complexity; do not pre-decide counts in the task text.
-- Model roles are fixed inside the script (Scope/Design/Review-judge/Fix: Fable; Explore: Sonnet; Implement: Opus). Do not override them.
+- The workflow's phases are dynamic: a Fable planner designs the stage plan per task (which stages exist, how many agents each fans out), so do not pre-decide stage structure or counts in the task text. A review+fix loop always runs at the end regardless of the plan.
+- Model assignment is fixed inside the script's role table (search/explore: Sonnet; design/review/planner/fix: Fable; implement: Opus). The planner picks roles, never models. Do not override them.
 - The workflow fails fast: it throws if a critical agent dies or an implementer reports its work item blocked. Report the error and what completed; once the blocker is resolved, resume with `Workflow({scriptPath, resumeFromRunId})` so finished agents replay from cache.

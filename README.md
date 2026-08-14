@@ -105,4 +105,4 @@ Runs an extremely strict maintainability review focused on abstraction quality, 
 
 ### `ultra`
 
-Runs a manual multi-agent build workflow: scope and design on Fable, exploration on Sonnet, implementation on Opus, then review via autoreview with Fable judging and applying fixes.
+Runs a manual multi-agent build workflow: Fable plans, investigates, designs, reviews, and makes decisions; Opus implements, fixes, and validates. A Fable review and Opus fix loop closes the workflow.

@@ -79,6 +79,10 @@ Surveys any codebase as a senior advisor and produces prioritized, self-containe
 
 Clones and inspects external repositories in a reusable local exploration cache (`~/.explore/repos`) without cluttering the active workspace.
 
+### `release-notes`
+
+Generates concise, evidence-based notes and updates only the body of the latest existing GitHub Release.
+
 ### `runtime-review`
 
 Diagnoses runtime CPU spikes, memory growth, heap leaks, GC pressure, and OOM crashes with code-first triage, guided profiling, and before/after verification.

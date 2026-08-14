@@ -1,6 +1,6 @@
 ---
 name: ultra
-description: Manual multi-agent build workflow — a Fable planner designs a task-specific stage plan (search/explore Sonnet, design/review Fable, implement Opus), then a Fable review+fix loop closes it out.
+description: Manual multi-agent build workflow — Fable owns judgment (plan, investigate, design, review, decide), Opus owns execution (implement, fix, validate); a Fable planner designs a task-specific stage plan, then a Fable review + Opus fix loop closes it out.
 disable-model-invocation: true
 ---
 
@@ -23,10 +23,11 @@ Run the user's multi-agent build workflow on the task given in the arguments. Th
 
    Do not rewrite or inline the script; always use `scriptPath` so the user's single canonical copy runs.
 
-3. When the workflow completes, read its result and report: the plan summary, work items implemented, the final review verdict, and any findings that remain unfixed. If the workflow ends with verdict `needs-fixes` after its fix rounds, say so plainly and list the outstanding findings — do not soften the outcome.
+3. When the workflow completes, read its result and report: the plan summary, the acceptance criteria, work items implemented, the final review verdict, and any findings that remain unfixed. If the workflow ends with verdict `needs-fixes` after its fix rounds, say so plainly and list the outstanding findings — do not soften the outcome.
 
 ## Notes
 
 - The workflow's phases are dynamic: a Fable planner designs the stage plan per task (which stages exist, how many agents each fans out), so do not pre-decide stage structure or counts in the task text. A review+fix loop always runs at the end regardless of the plan.
-- Model assignment is fixed inside the script's role table (search/explore: Sonnet; design/review/planner/fix: Fable; implement: Opus). The planner picks roles, never models. Do not override them.
-- The workflow fails fast: it throws if a critical agent dies or an implementer reports its work item blocked. Report the error and what completed; once the blocker is resolved, resume with `Workflow({scriptPath, resumeFromRunId})` so finished agents replay from cache.
+- Model assignment is fixed inside the script's role table and splits by responsibility: Fable owns judgment (planner, investigate, design, review, decisions on escalations), Opus owns execution (implement, fix). The planner picks roles, never models. Do not override them.
+- An implementer that hits a decision the plan does not cover escalates it: a Fable decision agent resolves the question and the implementer continues. This is not a failure.
+- The workflow fails fast: it throws if a critical agent dies, an implementer reports a genuine block (missing tooling or credentials), or an item still needs a decision after two escalations. Report the error and what completed; once the blocker is resolved, resume with `Workflow({scriptPath, resumeFromRunId})` so finished agents replay from cache.

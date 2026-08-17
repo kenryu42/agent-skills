@@ -51,6 +51,10 @@ Creates atomic git commits with clear scope.
 
 Runs a second-model code review using Codex (`gpt-5.6-sol`) by default, with optional Claude (`claude-fable-5`) review. Pair with `behavior-validator` for user-visible behavior checks.
 
+### `bro`
+
+Restates the last message in plain human language without jargon.
+
 ### `codex-first`
 
 Delegates substantial implementation, fixing, code exploration, rebasing, and PR landing to Codex CLI while Claude handles design, decisions, review, and verification.
@@ -97,7 +101,7 @@ SQLite database optimization, query writing, indexing, and best practices specia
 
 ### `test-coverage-improver`
 
-Runs coverage suites, identifies low-coverage files, proposes high-impact tests, and confirms with the user before writing tests.
+Runs coverage suites and adds direct, test-only quick wins until no eligible quick wins remain. Reports added tests and opportunities that require approval.
 
 ### `thermo-nuclear-code-quality-review`
 

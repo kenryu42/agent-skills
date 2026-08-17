@@ -140,4 +140,7 @@ run_interactive uninstall amp frontend-design >/dev/null ||
 	fail "foreign-link uninstall check failed"
 assert_managed_link "$TEST_HOME/.config/amp/skills/frontend-design" "$TEST_TMP/foreign-skill"
 
+bash "$TEST_DIR/test-test-coverage-improver.sh" ||
+	fail "test coverage improver contract failed"
+
 printf 'All agent-skills tests passed.\n'
